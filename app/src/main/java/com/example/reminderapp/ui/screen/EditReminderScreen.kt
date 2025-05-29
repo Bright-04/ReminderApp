@@ -34,6 +34,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.ui.platform.LocalContext
+import android.app.TimePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,29 +102,28 @@ fun EditReminderScreen(
     }
 
     if (showTimePickerDialog) {
-        // Basic Time Picker Dialog (Consider a more robust library or custom dialog for better UX)
-        AlertDialog(
-            onDismissRequest = { showTimePickerDialog = false },
-            title = { Text("Select Time") },
-            text = {
-                val timePickerState = rememberTimePickerState(
-                    initialHour = reminderDateTimeCalendar.get(Calendar.HOUR_OF_DAY),
-                    initialMinute = reminderDateTimeCalendar.get(Calendar.MINUTE),
-                    is24Hour = false // Or use LocalConfiguration.current.is24HourFormat
+        // Improved Time Picker Dialog using Android's TimePickerDialog for better UX
+        val context = LocalContext.current
+        val hour = reminderDateTimeCalendar.get(Calendar.HOUR_OF_DAY)
+        val minute = reminderDateTimeCalendar.get(Calendar.MINUTE)
+        DisposableEffect(showTimePickerDialog) {
+            if (showTimePickerDialog) {
+                val dialog = TimePickerDialog(
+                    context,
+                    { _, selectedHour, selectedMinute ->
+                        reminderDateTimeCalendar.set(Calendar.HOUR_OF_DAY, selectedHour)
+                        reminderDateTimeCalendar.set(Calendar.MINUTE, selectedMinute)
+                        showTimePickerDialog = false
+                    },
+                    hour,
+                    minute,
+                    false // set to true for 24-hour format
                 )
-                LaunchedEffect(timePickerState.hour, timePickerState.minute) {
-                    reminderDateTimeCalendar.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                    reminderDateTimeCalendar.set(Calendar.MINUTE, timePickerState.minute)
-                }
-                TimePicker(state = timePickerState)
-            },
-            confirmButton = {
-                TextButton(onClick = { showTimePickerDialog = false }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePickerDialog = false }) { Text("Cancel") }
+                dialog.setOnCancelListener { showTimePickerDialog = false }
+                dialog.show()
             }
-        )
+            onDispose { }
+        }
     }
 
 

@@ -1,19 +1,25 @@
 package com.example.reminderapp.ui.viewmodel
 
-import android.app.Application // Import Application
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.database.Cursor
+import android.net.Uri
+import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.reminderapp.data.model.Reminder
 import com.example.reminderapp.data.model.ReminderList
+import com.example.reminderapp.data.model.SoundFetchState
 import com.example.reminderapp.data.repository.ReminderRepository
-import android.content.Context
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.Flow
 
 class ReminderViewModel(
     private val context: Context
@@ -60,7 +66,7 @@ class ReminderViewModel(
     }
 
     // Get counts of active and completed reminders for a list as a Flow
-    fun getReminderCountsForList(listId: String): kotlinx.coroutines.flow.Flow<Pair<Int, Int>> {
+    fun getReminderCountsForList(listId: String): Flow<Pair<Int, Int>> {
         return repository.getRemindersForList(listId).map { reminders ->
             val active = reminders.count { !it.isCompleted }
             val completed = reminders.count { it.isCompleted }
@@ -74,9 +80,56 @@ class ReminderViewModel(
         addReminderList(list)
     }
 
-    // Stub for fetchCustomSound to avoid unresolved reference error
+    // Implements sound download and update logic
     fun fetchCustomSound(reminderId: String, url: String) {
-        // TODO: Implement sound download and update logic
+        viewModelScope.launch {
+            val reminder = repository.getReminderById(reminderId)
+            if (reminder != null) {
+                // Set state to FETCHING
+                repository.updateReminder(reminder.copy(soundFetchState = SoundFetchState.FETCHING, soundFetchProgress = 0))
+                val request = DownloadManager.Request(Uri.parse(url))
+                    .setTitle("Reminder Sound")
+                    .setDescription("Downloading custom reminder sound")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                    .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_MUSIC, "reminder_${reminderId}.mp3")
+                    .setAllowedOverMetered(true)
+                    .setAllowedOverRoaming(true)
+                val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                val downloadId = downloadManager.enqueue(request)
+
+                // Register receiver for download completion
+                val receiver = object : BroadcastReceiver() {
+                    override fun onReceive(ctx: Context, intent: Intent) {
+                        val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                        if (id == downloadId) {
+                            val cursor: Cursor = downloadManager.query(DownloadManager.Query().setFilterById(downloadId))
+                            if (cursor.moveToFirst()) {
+                                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                    val uriString = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                                    viewModelScope.launch {
+                                        val updated = reminder.copy(
+                                            localSoundUri = uriString,
+                                            soundFetchState = SoundFetchState.FETCHED,
+                                            soundFetchProgress = 100
+                                        )
+                                        repository.updateReminder(updated)
+                                    }
+                                } else {
+                                    viewModelScope.launch {
+                                        repository.updateReminder(reminder.copy(soundFetchState = SoundFetchState.ERROR, soundFetchProgress = null))
+                                    }
+                                }
+                            }
+                            cursor.close()
+                            // Unregister receiver
+                            context.unregisterReceiver(this)
+                        }
+                    }
+                }
+                context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+            }
+        }
     }
 
     companion object {
