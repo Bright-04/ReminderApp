@@ -2,8 +2,6 @@ package com.example.reminderapp.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverter
-import androidx.room.TypeConverters
 import java.util.UUID
 
 enum class SoundFetchState {
@@ -45,17 +43,4 @@ data class ReminderList(
 
 enum class Priority {
     NONE, LOW, MEDIUM, HIGH
-}
-
-// Type converters for Room
-class RoomTypeConverters {
-    @TypeConverter
-    fun fromPriority(priority: Priority): String = priority.name
-    @TypeConverter
-    fun toPriority(name: String): Priority = Priority.valueOf(name)
-
-    @TypeConverter
-    fun fromSoundFetchState(state: SoundFetchState): String = state.name
-    @TypeConverter
-    fun toSoundFetchState(name: String): SoundFetchState = SoundFetchState.valueOf(name)
 }
