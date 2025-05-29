@@ -8,23 +8,26 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class ReminderRepository(context: Context) {
+@Singleton
+class ReminderRepository @Inject constructor(context: Context) : IReminderRepository {
     private val db = ReminderDatabase.getDatabase(context)
     private val reminderDao = db.reminderDao()
     private val reminderListDao = db.reminderListDao()
+    
+    override fun getRemindersForList(listId: String): Flow<List<Reminder>> = reminderDao.getRemindersForList(listId)
+    override suspend fun getReminderById(id: String): Reminder? = reminderDao.getReminderById(id)
+    override suspend fun insertReminder(reminder: Reminder) = reminderDao.insert(reminder)
+    override suspend fun updateReminder(reminder: Reminder) = reminderDao.update(reminder)
+    override suspend fun deleteReminder(reminder: Reminder) = reminderDao.delete(reminder)
+    override suspend fun deleteReminderById(id: String) = reminderDao.deleteById(id)
 
-    fun getRemindersForList(listId: String): Flow<List<Reminder>> = reminderDao.getRemindersForList(listId)
-    suspend fun getReminderById(id: String): Reminder? = reminderDao.getReminderById(id)
-    suspend fun insertReminder(reminder: Reminder) = reminderDao.insert(reminder)
-    suspend fun updateReminder(reminder: Reminder) = reminderDao.update(reminder)
-    suspend fun deleteReminder(reminder: Reminder) = reminderDao.delete(reminder)
-    suspend fun deleteReminderById(id: String) = reminderDao.deleteById(id)
-
-    fun getAllLists(): Flow<List<ReminderList>> = reminderListDao.getAllLists()
-    suspend fun getListById(id: String): ReminderList? = reminderListDao.getListById(id)
-    suspend fun insertList(list: ReminderList) = reminderListDao.insert(list)
-    suspend fun updateList(list: ReminderList) = reminderListDao.update(list)
-    suspend fun deleteList(list: ReminderList) = reminderListDao.delete(list)
-    suspend fun deleteListById(id: String) = reminderListDao.deleteById(id)
+    override fun getAllLists(): Flow<List<ReminderList>> = reminderListDao.getAllLists()
+    override suspend fun getListById(id: String): ReminderList? = reminderListDao.getListById(id)
+    override suspend fun insertList(list: ReminderList) = reminderListDao.insert(list)
+    override suspend fun updateList(list: ReminderList) = reminderListDao.update(list)
+    override suspend fun deleteList(list: ReminderList) = reminderListDao.delete(list)
+    override suspend fun deleteListById(id: String) = reminderListDao.deleteById(id)
 }

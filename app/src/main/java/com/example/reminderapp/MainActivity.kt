@@ -21,14 +21,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.activity.viewModels
 import com.example.reminderapp.ui.navigation.AppNavigation
 import com.example.reminderapp.ui.theme.ReminderAppTheme
 import com.example.reminderapp.ui.viewmodel.ReminderViewModel
-import com.example.reminderapp.util.NotificationHelper
+import com.example.reminderapp.util.INotificationHelper
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
-class MainActivity : ComponentActivity() {
-
-    private val requestPermissionLauncher =
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {    private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
                 // Permission is granted. Continue the action or workflow in your app.
@@ -40,34 +42,33 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    private lateinit var reminderViewModel: ReminderViewModel
+    // Use Hilt to inject the ViewModel
+    private val reminderViewModel: ReminderViewModel by viewModels()
+    
+    // Use Hilt to inject the NotificationHelper
+    @Inject
+    lateinit var notificationHelper: INotificationHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        NotificationHelper.createNotificationChannel(this)
+        // Create notification channels using the injected NotificationHelper
+        notificationHelper.createNotificationChannel()
         requestNotificationPermission()
-
-        // Initialize ViewModel using the custom factory
-        val factory = ReminderViewModel.provideFactory(applicationContext)
-        reminderViewModel = ViewModelProvider(this, factory).get(ReminderViewModel::class.java)
 
         setContent {
             ReminderAppTheme {
                 Box(modifier = Modifier.fillMaxSize()) {
                     Image(
                         painter = painterResource(id = R.drawable.bgv1),
-                        contentDescription = null,
                         modifier = Modifier.fillMaxSize().alpha(0.4f),
+                        contentDescription = null,
                         contentScale = ContentScale.Crop
                     )
                     // App content overlays the background
                     AppNavigation(
                         reminderViewModel = reminderViewModel,
-                        // Example: how you might pass deep link info
-                        // startDestination = determineStartDestination(intent),
-                        // startDestinationArgs = extractArgs(intent)
                     )
                 }
             }

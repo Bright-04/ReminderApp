@@ -7,11 +7,12 @@ import android.content.Intent
 import android.os.Build
 import com.example.reminderapp.data.model.Reminder
 import com.example.reminderapp.data.model.SoundFetchState
+import javax.inject.Inject
 
-class AlarmScheduler(private val context: Context) {
+class AlarmScheduler @Inject constructor(private val context: Context) : IAlarmScheduler {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    fun schedule(reminder: Reminder) {
+    override fun schedule(reminder: Reminder) {
         // Only schedule if notifications are enabled
         if (!reminder.notificationsEnabled) {
             cancel(reminder)
@@ -78,7 +79,7 @@ class AlarmScheduler(private val context: Context) {
     }
 
     // New method for scheduling repeats, distinct request code
-    fun scheduleRepeat(reminder: Reminder, remainingRepeats: Int) {
+    override fun scheduleRepeat(reminder: Reminder, remainingRepeats: Int) {
         if (!reminder.notificationsEnabled) return // Only schedule if enabled
         if (reminder.dueDate == null || reminder.dueDate!! <= System.currentTimeMillis() || reminder.isCompleted || remainingRepeats < 0) {
             return
@@ -135,7 +136,7 @@ class AlarmScheduler(private val context: Context) {
     }
 
 
-    fun cancel(reminder: Reminder) {
+    override fun cancel(reminder: Reminder) {
         // Cancel the main alarm
         val mainIntent = Intent(context, ReminderAlarmReceiver::class.java)
         val mainPendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {

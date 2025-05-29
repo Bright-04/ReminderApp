@@ -1,6 +1,7 @@
 package com.example.reminderapp.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,7 +28,7 @@ object Routes {
 }
 
 @Composable
-fun AppNavigation(reminderViewModel: ReminderViewModel) {
+fun AppNavigation(reminderViewModel: ReminderViewModel = hiltViewModel()) {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = Routes.MAIN_SCREEN) {

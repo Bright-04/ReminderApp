@@ -9,22 +9,25 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.reminderapp.data.model.Reminder
 import com.example.reminderapp.data.model.ReminderList
 import com.example.reminderapp.data.model.SoundFetchState
-import com.example.reminderapp.data.repository.ReminderRepository
+import com.example.reminderapp.data.repository.IReminderRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
 
-class ReminderViewModel(
-    private val context: Context
+@HiltViewModel
+class ReminderViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val repository: IReminderRepository
 ) : ViewModel() {
-    private val repository = ReminderRepository(context)
 
     val reminderLists = repository.getAllLists().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -125,18 +128,8 @@ class ReminderViewModel(
                             // Unregister receiver
                             context.unregisterReceiver(this)
                         }
-                    }
-                }
+                    }                }
                 context.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
-            }
-        }
-    }
-
-    companion object {
-        fun provideFactory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return ReminderViewModel(context) as T
             }
         }
     }
