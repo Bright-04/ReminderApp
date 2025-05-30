@@ -38,6 +38,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.ui.platform.LocalContext
 import android.app.TimePickerDialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,29 +49,34 @@ fun EditReminderScreen(
     reminderId: String?
 ) {
     val isEditing = reminderId != null
-    val existingReminder = if (isEditing) viewModel.getReminder(reminderId!!, listId) else null
+    val allRemindersFromRepository by viewModel.getRemindersForList(listId).collectAsStateWithLifecycle(initialValue = emptyList())
+    val reminder = if (isEditing) allRemindersFromRepository.find { it.id == reminderId } else null
 
-    var title by rememberSaveable { mutableStateOf(existingReminder?.title ?: "") }
-    var notes by rememberSaveable { mutableStateOf(existingReminder?.notes ?: "") }
+    val isLoading = isEditing && reminder == null
 
-    val initialCalendar = Calendar.getInstance().apply {
-        existingReminder?.dueDate?.let { timeInMillis = it }
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
     }
+
+    // Form fields initialized from reminder or defaults
+    var title by rememberSaveable { mutableStateOf(reminder?.title ?: "") }
+    var notes by rememberSaveable { mutableStateOf(reminder?.notes ?: "") }
+    val initialCalendar = Calendar.getInstance().apply { reminder?.dueDate?.let { timeInMillis = it } }
     var reminderDateTimeCalendar by remember { mutableStateOf(initialCalendar) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var showTimePickerDialog by remember { mutableStateOf(false) }
-    var dueDateEnabled by rememberSaveable { mutableStateOf(existingReminder?.dueDate != null) }
-
-    // Notification settings states
-    var soundEnabled by rememberSaveable { mutableStateOf(existingReminder?.isSoundEnabled ?: true) }
-    var notificationsEnabled by rememberSaveable { mutableStateOf(existingReminder?.notificationsEnabled ?: true) } // New state
-    // var customSoundUri by rememberSaveable { mutableStateOf(existingReminder?.notificationSoundUri ?: "") } // Old field
-    var remoteSoundUrlInput by rememberSaveable { mutableStateOf(existingReminder?.remoteSoundUrl ?: "") }
-    var vibrateEnabled by rememberSaveable { mutableStateOf(existingReminder?.isVibrateEnabled ?: true) }
-    var selectedAdvanceMinutes by rememberSaveable { mutableStateOf(existingReminder?.advanceNotificationMinutes ?: 0) }
-    var repeatCount by rememberSaveable { mutableStateOf(existingReminder?.repeatCount?.toString() ?: "0") }
-    var repeatInterval by rememberSaveable { mutableStateOf(existingReminder?.repeatIntervalMinutes?.toString() ?: "5") }
-    var selectedPriority by remember { mutableStateOf(existingReminder?.priority ?: com.example.reminderapp.data.model.Priority.NONE) }
+    var dueDateEnabled by rememberSaveable { mutableStateOf(reminder?.dueDate != null) }
+    var soundEnabled by rememberSaveable { mutableStateOf(reminder?.isSoundEnabled ?: true) }
+    var notificationsEnabled by rememberSaveable { mutableStateOf(reminder?.notificationsEnabled ?: true) }
+    var remoteSoundUrlInput by rememberSaveable { mutableStateOf(reminder?.remoteSoundUrl ?: "") }
+    var vibrateEnabled by rememberSaveable { mutableStateOf(reminder?.isVibrateEnabled ?: true) }
+    var selectedAdvanceMinutes by rememberSaveable { mutableStateOf(reminder?.advanceNotificationMinutes ?: 0) }
+    var repeatCount by rememberSaveable { mutableStateOf(reminder?.repeatCount?.toString() ?: "0") }
+    var repeatInterval by rememberSaveable { mutableStateOf(reminder?.repeatIntervalMinutes?.toString() ?: "5") }
+    var selectedPriority by remember { mutableStateOf(reminder?.priority ?: com.example.reminderapp.data.model.Priority.NONE) }
 
 
     if (showDatePickerDialog) {
@@ -128,20 +134,20 @@ fun EditReminderScreen(
 
 
     // Get all reminders for this list from the ViewModel
-    val allRemindersFromRepository by viewModel.getRemindersForList(listId).collectAsState(initial = emptyList())
+    // val allRemindersFromRepository by viewModel.getRemindersForList(listId).collectAsState(initial = emptyList())
 
     // Find the live instance of the reminder being edited from the repository's list.
-    val liveReminderInstance = remember(existingReminder?.id, allRemindersFromRepository) {
-        if (isEditing && existingReminder?.id != null) {
-            allRemindersFromRepository.find { it.id == existingReminder.id }
+    val liveReminderInstance = remember(reminder?.id, allRemindersFromRepository) {
+        if (isEditing && reminder?.id != null) {
+            allRemindersFromRepository.find { it.id == reminder.id }
         } else {
             null // Not editing or no existing reminder, so no live instance from repo yet.
         }
     }
     // Determine the sound fetch status and local URI to display.
-    val soundFetchStatus = liveReminderInstance?.soundFetchState ?: existingReminder?.soundFetchState ?: SoundFetchState.IDLE
-    val actualLocalSoundUri = liveReminderInstance?.localSoundUri ?: existingReminder?.localSoundUri
-    val soundDownloadProgress = liveReminderInstance?.soundFetchProgress ?: existingReminder?.soundFetchProgress
+    val soundFetchStatus = liveReminderInstance?.soundFetchState ?: reminder?.soundFetchState ?: SoundFetchState.IDLE
+    val actualLocalSoundUri = liveReminderInstance?.localSoundUri ?: reminder?.localSoundUri
+    val soundDownloadProgress = liveReminderInstance?.soundFetchProgress ?: reminder?.soundFetchProgress
 
 
     Scaffold(
@@ -160,20 +166,20 @@ fun EditReminderScreen(
                             val currentRepeatCount = repeatCount.toIntOrNull() ?: 0
                             val currentRepeatInterval = repeatInterval.toIntOrNull() ?: 5
 
-                            if (isEditing && existingReminder != null) {
+                            if (isEditing && reminder != null) {
                                 // Preserve existing localSoundUri and fetchState unless remoteSoundUrlInput changes them
                                 val finalRemoteSoundUrl = remoteSoundUrlInput.ifBlank { null }
-                                var soundStateToSave = existingReminder.soundFetchState
-                                var localUriToSave = existingReminder.localSoundUri
+                                var soundStateToSave = reminder.soundFetchState
+                                var localUriToSave = reminder.localSoundUri
 
-                                if (existingReminder.remoteSoundUrl != finalRemoteSoundUrl) {
+                                if (reminder.remoteSoundUrl != finalRemoteSoundUrl) {
                                     soundStateToSave = SoundFetchState.IDLE
                                     localUriToSave = null
                                 }
 
 
                                 viewModel.updateReminder(
-                                    existingReminder.copy(
+                                    reminder.copy(
                                         title = title,
                                         notes = notes.ifBlank { null },
                                         dueDate = finalDueDate,
@@ -398,7 +404,7 @@ fun EditReminderScreen(
                                     Button(
                                         onClick = {
                                             if (soundEnabled && remoteSoundUrlInput.isNotBlank()) {
-                                                existingReminder?.id?.let { remId ->
+                                                reminder?.id?.let { remId ->
                                                     viewModel.fetchCustomSound(remId, remoteSoundUrlInput)
                                                 }
                                             }
@@ -522,7 +528,7 @@ fun EditReminderScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
-                        existingReminder?.let {
+                        reminder?.let {
                             viewModel.deleteReminder(it)
                             navController.popBackStack()
                         }

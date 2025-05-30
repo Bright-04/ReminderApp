@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,75 +22,62 @@ import androidx.navigation.NavController
 import com.example.reminderapp.data.model.ReminderList
 import com.example.reminderapp.ui.navigation.Routes
 import com.example.reminderapp.ui.viewmodel.ReminderViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(navController: NavController, viewModel: ReminderViewModel) {
-    val lists by viewModel.reminderLists.collectAsState(initial = emptyList())
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Column {
-                        Text("Promptly")
-                        Text(
-                            text = "${lists.size} list${if (lists.size != 1) "s" else ""}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate(Routes.ADD_LIST_SCREEN) }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add List")
+    val listsState = viewModel.reminderLists.collectAsStateWithLifecycle(initialValue = emptyList())
+    val lists = listsState.value
+    
+    when {
+        lists.isEmpty() -> {
+            // Empty state
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No lists found. Tap + to add a new list.")
             }
         }
-    ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            // Categories section (Simplified: just "My Lists")
-            Text(
-                text = "My Lists",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
-            )
-            if (lists.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "No reminder lists yet",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Tap the + button to add one",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+        else -> {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { 
+                            Column {
+                                Text("Promptly")
+                                Text(
+                                    text = "${lists.size} list${if (lists.size != 1) "s" else ""}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    )
+                },
+                floatingActionButton = {
+                    FloatingActionButton(onClick = { navController.navigate(Routes.ADD_LIST_SCREEN) }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add List")
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    items(lists) { list ->
-                        ReminderListRow(
-                            list = list,
-                            onClick = {
-                                navController.navigate(Routes.listDetail(list.id))
-                            },
-                            viewModel = viewModel
-                        )
+            ) { paddingValues ->
+                Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                    Text(
+                        text = "My Lists",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        items(lists) { list ->
+                            ReminderListRow(
+                                list = list,
+                                onClick = {
+                                    navController.navigate(Routes.listDetail(list.id))
+                                },
+                                viewModel = viewModel
+                            )
+                        }
                     }
                 }
             }
@@ -101,7 +87,7 @@ fun MainScreen(navController: NavController, viewModel: ReminderViewModel) {
 
 @Composable
 fun ReminderListRow(list: ReminderList, onClick: () -> Unit, viewModel: ReminderViewModel) {
-    val countsState by viewModel.getReminderCountsForList(list.id).collectAsState(initial = 0 to 0)
+    val countsState by viewModel.getReminderCountsForList(list.id).collectAsStateWithLifecycle(initialValue = 0 to 0)
     val activeCount = countsState.first
     val completedCount = countsState.second
     
@@ -159,7 +145,8 @@ fun ReminderListRow(list: ReminderList, onClick: () -> Unit, viewModel: Reminder
                         imageVector = Icons.Filled.CheckCircle,
                         contentDescription = "Completed reminders",
                         tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f),
-                        modifier = Modifier.size(20.dp)                    )
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     
                     Text(

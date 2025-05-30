@@ -25,6 +25,15 @@ fun EditListScreen(
 
     var listName by remember { mutableStateOf(existingList?.name ?: "") }
 
+    val isLoading = isEditing && existingList == null
+
+    if (isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

@@ -14,9 +14,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -35,6 +35,7 @@ import com.example.reminderapp.ui.viewmodel.ReminderViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +45,12 @@ fun ReminderListDetailScreen(
     listId: String
 ) {
     val list = viewModel.getReminderList(listId)
-    val reminders by viewModel.getRemindersForList(listId).collectAsState()
+    val remindersState = viewModel.getRemindersForList(listId).collectAsStateWithLifecycle(initialValue = emptyList())
+    val reminders = remindersState.value
+
+    // Derived states to avoid flicker
+    val isLoading = remember(reminders) { reminders.isEmpty() }
+    val isEmpty = remember(reminders) { reminders.isEmpty() }
 
     Scaffold(
         topBar = {
@@ -53,8 +59,10 @@ fun ReminderListDetailScreen(
                     Column {
                         Text(list?.name ?: "Reminders")
                         if (reminders.isNotEmpty()) {
+                            val activeCount = reminders.count { it is com.example.reminderapp.data.model.Reminder && !it.isCompleted }
+                            val completedCount = reminders.count { it is com.example.reminderapp.data.model.Reminder && it.isCompleted }
                             Text(
-                                text = "${reminders.count { !it.isCompleted }} active, ${reminders.count { it.isCompleted }} completed",
+                                text = "$activeCount active, $completedCount completed",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -74,89 +82,19 @@ fun ReminderListDetailScreen(
             }
         }
     ) { paddingValues ->
-        if (list == null) {
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("List not found.")
-            }
-            return@Scaffold
-        }
-
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            if (reminders.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "No reminders in this list yet",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Tap the + button to add one",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                // Group reminders by completion status
-                val (completed, active) = reminders.partition { it.isCompleted }
-                
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    // Active reminders section
-                    if (active.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "Active",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
-                        
-                        items(active.sortedWith(
-                            compareBy<Reminder> { 
-                                it.dueDate ?: Long.MAX_VALUE 
-                            }.thenByDescending { 
-                                it.priority.ordinal 
-                            }
-                        )) { reminder ->
-                            ReminderRow(
-                                reminder = reminder,
-                                onToggleComplete = { viewModel.toggleReminderCompletion(reminder) },
-                                onClick = { navController.navigate(Routes.editReminder(listId, reminder.id)) }
-                            )
-                        }
-                    }
-                    
-                    // Completed reminders section
-                    if (completed.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "Completed",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
-                        
-                        items(completed) { reminder ->
-                            ReminderRow(
-                                reminder = reminder,
-                                onToggleComplete = { viewModel.toggleReminderCompletion(reminder) },
-                                onClick = { navController.navigate(Routes.editReminder(listId, reminder.id)) }
-                            )
-                        }
-                    }
+        when {
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            isEmpty -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No reminders in this list.") }
+            else -> LazyColumn(
+                modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                items(reminders) { reminder ->
+                    ReminderRow(
+                        reminder = reminder,
+                        onToggleComplete = { viewModel.toggleReminderCompletion(reminder) },
+                        onClick = { navController.navigate(Routes.editReminder(listId, reminder.id)) }
+                    )
                 }
             }
         }
